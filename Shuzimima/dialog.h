@@ -2,16 +2,18 @@
 #define DIALOG_H
 
 #include <QDialog>
-#include <QPushButton>
-#include <QLabel>
-#include <QPainter>
-#include <QMouseEvent>
-#include <vector>
-#include <QTimer>
 #include <QSerialPort>
 #include <QSerialPortInfo>
+#include <QPushButton>
 #include <QComboBox>
-#include <QList>
+#include <QLabel>
+#include <QPainter>
+#include <QPaintEvent>
+#include <QMouseEvent>
+#include <QMap>
+#include <QPair>
+#include <QVector>
+#include <QPoint>
 
 class Dialog : public QDialog
 {
@@ -31,77 +33,67 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private slots:
-    void onSetPasswordClicked();
-    void onInputPasswordClicked();
-    void onConfirmClicked();
     void on_scan_clicked();
     void on_open_clicked();
     void data_Receive();
+    void onCircleButtonClicked(QPushButton* btn);
     void handleCircleButtonClicked();
+    void onBackClicked();
+    void onResetClicked();
+    void onSetPasswordClicked();
+    void onInputPasswordClicked();
+    void onConfirmClicked();
 
 private:
-    // UI初始化方法
     void setupUI();
     void setupSerialPortUI();
     void setupCircleButtons();
     void setupFunctionButtons();
-    void resetCircleButtons();
-
-
-    // 绘图方法
-    void drawBg(QPainter *painter);
-    void drawJoinLine(QPainter *painter);
-    void drawCircleText(QPainter *painter);  // 新增：绘制圆圈文本
-    QPoint getCircleCenter(int gridX, int gridY) const;
-    QString getCurrentSequenceText();
-
-    // 功能方法
+    void setupControlButtons();
     void serialSet();
     void checkPressureValue(int row, int col, int value);
-    void onCircleButtonClicked(QPushButton* btn);
-
-    // 串口相关
-    QSerialPort *serial;
-    QByteArray buffer;
-    QVector<QVector<int>> allData;
-
-    // 压力传感器值
-    int P11, P12, P13, P14;
-    int P21, P22, P23, P24;
-    int P31, P32, P33, P34;
+    void resetCircleButtons();
+    QString getCurrentSequenceText();
+    void drawBg(QPainter *painter);
+    void drawJoinLine(QPainter *painter);
+    QPoint getCircleCenter(int gridX, int gridY) const;
 
     // UI控件
     QPushButton *m_closeButton;
-    QPushButton *m_setPasswordBtn;
-    QPushButton *m_inputPasswordBtn;
-    QPushButton *m_confirmBtn;
-    QList<QPushButton*> m_circleButtons;
-    QLabel *m_statusLabel;
-
-    // 串口配置控件
     QComboBox *m_nameCombo;
     QComboBox *m_botelvCombo;
     QComboBox *m_jiaoyanweiCombo;
     QComboBox *m_shujuweiCombo;
     QComboBox *m_tingzhiweiCombo;
+    QLabel *m_statusLabel;
+    QPushButton *m_setPasswordBtn;
+    QPushButton *m_inputPasswordBtn;
+    QPushButton *m_confirmBtn;
+    QPushButton *m_backButton;
+    QPushButton *m_resetButton;
 
-    // 几何参数
-    int w;
-    int h;
+    // 串口
+    QSerialPort *serial;
+    QByteArray buffer;
+
+    // 压力值变量
+    uint16_t P11, P12, P13, P14;
+    uint16_t P21, P22, P23, P24;
+    uint16_t P31, P32, P33, P34;
+
+    // 应用程序变量
+    int w, h;
     int m_radius;
     int x_offset;
     int y_offset;
-
-    // 圆圈文本内容
-    QVector<QVector<QString>> m_circleTexts;  // 新增：存储圆圈文本
-
-    // 状态变量
-    int m_TryNum;
     Mode m_currentMode;
-
-    std::vector<QPoint> m_TouchPoints;
-    std::vector<int> m_TouchOrder;
-    std::vector<int> m_setPassword;
+    int m_TryNum;
+    bool m_pressureState[3][4];
+    QVector<QPushButton*> m_circleButtons;
+    QVector<QPoint> m_TouchPoints;
+    QVector<int> m_TouchOrder;
+    QVector<int> m_setPassword;
+    QPair<int, int> m_lastPressedButton;
 };
 
 #endif // DIALOG_H

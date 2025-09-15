@@ -20,6 +20,13 @@ Dialog::Dialog(QWidget *parent) : QDialog(parent)
     m_currentMode = MODE_NONE;
     m_TryNum = 0;
 
+    // 初始化压力状态数组
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++) {
+            m_pressureState[i][j] = false;
+        }
+    }
+
     // 初始化串口
     serial = new QSerialPort(this);
     connect(serial, &QSerialPort::readyRead, this, &Dialog::data_Receive);
@@ -303,7 +310,7 @@ void Dialog::data_Receive()
             checkPressureValue(2, 2, P33);  // 第三行第三列
             checkPressureValue(2, 3, P34);  // 新增第三行第四列
 
-            buffer.remove(0, 25);  // 增加缓冲区移除的大小
+            buffer.remove(0, 26);  // 移除已处理的数据包
         }
         else
         {
@@ -330,6 +337,9 @@ void Dialog::checkPressureValue(int row, int col, int value)
 // 圆形按钮点击处理
 void Dialog::setupCircleButtons()
 {
+    // 创建后退和重置按钮
+    setupControlButtons();
+
     // 创建圆形按钮 (3x4网格)
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 4; j++) {
@@ -368,6 +378,81 @@ void Dialog::setupCircleButtons()
     }
 }
 
+void Dialog::setupControlButtons()
+{
+    // 创建后退和重置按钮，样式与串口配置按钮保持一致
+    QString btnStyle = "QPushButton {"
+                      "   color: white; background: rgba(70, 130, 180, 150);"
+                      "   border: 1px solid rgb(173, 216, 230); border-radius: 5px;"
+                      "   padding: 5px; min-width: 80px;"
+                      "   font-size: 15px;"
+                      "}"
+                      "QPushButton:hover { background: rgba(100, 150, 200, 150); }";
+
+    // 后退按钮
+    m_backButton = new QPushButton("后退", this);
+    m_backButton->setStyleSheet(btnStyle);
+    m_backButton->setFixedSize(120, 40);
+
+    // 重置按钮
+    m_resetButton = new QPushButton("重置", this);
+    m_resetButton->setStyleSheet(btnStyle);
+    m_resetButton->setFixedSize(120, 40);
+
+    // 计算位置 - 放在数字按钮左侧
+    int controlBtnX = w/2 + x_offset - 250;  // 数字按钮区域左侧
+    int controlBtnY = h/2 + y_offset + 50;   // 垂直居中位置
+
+    m_backButton->move(controlBtnX, controlBtnY);
+    m_resetButton->move(controlBtnX, controlBtnY + 60);
+
+    // 连接信号槽
+    connect(m_backButton, &QPushButton::clicked, this, &Dialog::onBackClicked);
+    connect(m_resetButton, &QPushButton::clicked, this, &Dialog::onResetClicked);
+}
+
+void Dialog::onBackClicked()
+{
+    if (!m_TouchOrder.isEmpty()) {
+        m_TouchOrder.removeLast();
+        if (!m_TouchPoints.isEmpty()) {
+            m_TouchPoints.removeLast();
+        }
+
+        // 更新状态显示
+        if (m_currentMode == MODE_SET) {
+            m_statusLabel->setText("请设置密码: " + getCurrentSequenceText());
+        } else if (m_currentMode == MODE_INPUT) {
+            m_statusLabel->setText("请输入密码: " + getCurrentSequenceText());
+        }
+
+        // 如果密码字符数少于2，隐藏确认按钮
+        if (m_TouchOrder.size() < 2) {
+            m_confirmBtn->setVisible(false);
+        }
+
+        update();
+    }
+}
+
+void Dialog::onResetClicked()
+{
+    m_TouchPoints.clear();
+    m_TouchOrder.clear();
+    m_confirmBtn->setVisible(false);
+
+    // 更新状态显示
+    if (m_currentMode == MODE_SET) {
+        m_statusLabel->setText("请设置密码");
+    } else if (m_currentMode == MODE_INPUT) {
+        m_statusLabel->setText("请输入密码");
+    }
+
+    // 重置圆形按钮样式
+    resetCircleButtons();
+    update();
+}
+
 void Dialog::onCircleButtonClicked(QPushButton* btn)
 {
     int gridX = btn->property("gridX").toInt();
@@ -395,7 +480,7 @@ void Dialog::onCircleButtonClicked(QPushButton* btn)
     m_TouchOrder.push_back(order);
 
     // 不再修改按钮样式，保持原样
-    // btn->setStyleSheet(...);
+    // btn->setStyleSheet(...);z
 
     // Update status label based on current mode
     if (m_currentMode == MODE_SET) {
@@ -425,9 +510,6 @@ QString Dialog::getCurrentSequenceText()
         int gridY = order / 3;
         int gridX = order % 3;
         sequence += circleTexts[gridY][gridX];
-//        if (i < m_TouchOrder.size() - 1) {
-//            sequence += ", ";
-//        }
     }
     return sequence;
 }

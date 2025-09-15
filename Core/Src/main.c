@@ -34,7 +34,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define ADC_CHANNEL_COUNT 12
+#define SAMPLE_BUFFER_SIZE 10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,12 +59,17 @@ uint16_t ADC_Value10 = 0;
 uint16_t ADC_Value11 = 0;
 uint16_t ADC_Value12 = 0;
 uint8_t uart_buffer[26]; // 用于存储发送的数据
+// 新增的数组和计数器
+uint16_t adc_values[ADC_CHANNEL_COUNT][SAMPLE_BUFFER_SIZE];
+uint8_t sample_count[ADC_CHANNEL_COUNT] = {0};
+uint8_t buffer_full_flag = 0; // 缓冲区满标志
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+uint16_t get_max_value(uint16_t *array, uint8_t size);
+void Process_ADC_Data(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,6 +104,72 @@ void Send_UART_Data(void)
     uart_buffer[25] = 0x0B; // 最终帧尾
 
     HAL_UART_Transmit(&huart3, uart_buffer, 26, HAL_MAX_DELAY); // 发送数据
+		HAL_Delay(500);
+}
+
+uint16_t get_max_value(uint16_t *array, uint8_t size)
+{
+    uint16_t max_val = 0;
+    for(uint8_t i = 0; i < size; i++)
+    {
+        if(array[i] > max_val)
+        {
+            max_val = array[i];
+        }
+    }
+    return max_val;
+}
+
+void Process_ADC_Data(void)
+{
+    // 读取所有ADC通道
+    uint16_t current_values[ADC_CHANNEL_COUNT] = {
+        ADC_Read(ADC_CHANNEL_0),
+        ADC_Read(ADC_CHANNEL_1),
+        ADC_Read(ADC_CHANNEL_2),
+        ADC_Read(ADC_CHANNEL_3),
+        ADC_Read(ADC_CHANNEL_4),
+        ADC_Read(ADC_CHANNEL_5),
+        ADC_Read(ADC_CHANNEL_6),
+        ADC_Read(ADC_CHANNEL_7),
+        ADC_Read(ADC_CHANNEL_8),
+        ADC_Read(ADC_CHANNEL_9),
+        ADC_Read(ADC_CHANNEL_10),
+        ADC_Read(ADC_CHANNEL_11)
+    };
+    
+    // 将每个通道的值存入对应的数组
+    for(uint8_t ch = 0; ch < ADC_CHANNEL_COUNT; ch++)
+    {
+        adc_values[ch][sample_count[ch]] = current_values[ch];
+        sample_count[ch]++;
+        
+        // 如果数组已满，计算最大值并重置计数器
+        if(sample_count[ch] >= SAMPLE_BUFFER_SIZE)
+        {
+            // 设置缓冲区满标志
+            buffer_full_flag = 1;
+            
+            // 计算最大值并赋给对应的ADC_Value变量
+            switch(ch)
+            {
+                case 0: ADC_Value1 = get_max_value(adc_values[0], SAMPLE_BUFFER_SIZE); break;
+                case 1: ADC_Value2 = get_max_value(adc_values[1], SAMPLE_BUFFER_SIZE); break;
+                case 2: ADC_Value3 = get_max_value(adc_values[2], SAMPLE_BUFFER_SIZE); break;
+                case 3: ADC_Value4 = get_max_value(adc_values[3], SAMPLE_BUFFER_SIZE); break;
+                case 4: ADC_Value5 = get_max_value(adc_values[4], SAMPLE_BUFFER_SIZE); break;
+                case 5: ADC_Value6 = get_max_value(adc_values[5], SAMPLE_BUFFER_SIZE); break;
+                case 6: ADC_Value7 = get_max_value(adc_values[6], SAMPLE_BUFFER_SIZE); break;
+                case 7: ADC_Value8 = get_max_value(adc_values[7], SAMPLE_BUFFER_SIZE); break;
+                case 8: ADC_Value9 = get_max_value(adc_values[8], SAMPLE_BUFFER_SIZE); break;
+                case 9: ADC_Value10 = get_max_value(adc_values[9], SAMPLE_BUFFER_SIZE); break;
+                case 10: ADC_Value11 = get_max_value(adc_values[10], SAMPLE_BUFFER_SIZE); break;
+                case 11: ADC_Value12 = get_max_value(adc_values[11], SAMPLE_BUFFER_SIZE); break;
+            }
+            
+            sample_count[ch] = 0; // 重置计数器重新开始采集
+        }
+    }
 }
 /* USER CODE END 0 */
 
@@ -142,21 +214,20 @@ int main(void)
   while (1)
   {
 		HAL_ADC_Start(&hadc1);//启动一次转换
-		ADC_Value1 = ADC_Read(ADC_CHANNEL_0);
-		ADC_Value2 = ADC_Read(ADC_CHANNEL_1);
-		ADC_Value3 = ADC_Read(ADC_CHANNEL_2);
-		ADC_Value4 = ADC_Read(ADC_CHANNEL_3);
-		ADC_Value5 = ADC_Read(ADC_CHANNEL_4);
-		ADC_Value6 = ADC_Read(ADC_CHANNEL_5);
-		ADC_Value7 = ADC_Read(ADC_CHANNEL_6);
-		ADC_Value8 = ADC_Read(ADC_CHANNEL_7);
-		ADC_Value9 = ADC_Read(ADC_CHANNEL_8);
-		ADC_Value10 = ADC_Read(ADC_CHANNEL_9);
-		ADC_Value11 = ADC_Read(ADC_CHANNEL_10);
-		ADC_Value12 = ADC_Read(ADC_CHANNEL_11);
+		
+		// 处理ADC数据（采集并检查是否需要计算最大值）
+		Process_ADC_Data();
+		
 		HAL_ADC_Stop(&hadc1);
-		Send_UART_Data(); // 发送数据
-		HAL_Delay(100);
+		
+		// 只有当所有通道都采集了10个数据后才发送
+		if(buffer_full_flag)
+		{
+			Send_UART_Data(); // 发送数据
+			buffer_full_flag = 0; // 清除标志
+		}
+		
+		HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
